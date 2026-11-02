@@ -2,14 +2,23 @@
 
 ### Normal execution:
 
-During a normal swap/mint/melt operation, the client generates a tag $t$ deterministically with its wallet master key and an appropriately chosen derivation path. Each output in the request is identified by its own $t^i$. After the request is successful, the Mint stores the attributes
-in the outputs of the request $(M_a^i, t^i)$ in its database.
+During a normal swap/mint/melt operation, each requested output carries a fresh
+per-request nonce $\rho^i$ (unguessable, e.g. 32 random bytes). The Mint derives
+the output's tag statelessly as $t^i = \text{HMAC-SHA2}(\text{SHA256}(sk),\
+\text{"cashu-kvac-tag-v1"} \,\|\, \rho^i \,\|\, M_a^i \,\|\, M_s^i)$. The wallet
+stores $(\rho^i, r_a^i)$ with each coin (or derives $\rho^i$ from its own seed,
+e.g. $\rho^i \leftarrow \text{HMAC-SHA2}(\text{seed}, \text{"rho"}, i)$, to keep the
+per-coin state seed-only). After the request is successful, the Mint stores the
+attributes in the outputs of the request $(M_a^i, t^i)$ in its database.
 
 ### Recovery:
 
 Recovery works as follows:
 
-* For each possible output $i$ the client derives its blinding factor $r_a^i$ and its tag $t_a^i$. 
+* For each possible output $i$ the client derives its blinding factor $r_a^i$ and its
+  nonce $\rho^i$, then recomputes the tag $t^i$ with the Mint (the Mint re-evaluates
+  the HMAC over $(\rho^i, M_a^i, M_s^i)$; the round trip is needed because the HMAC
+  key is Mint-side, which is what made wallet-chosen tags safe to remove).
 
 * The Client then requests the server (Mint) for the $M_a^i$ associated with each $t^i$
 

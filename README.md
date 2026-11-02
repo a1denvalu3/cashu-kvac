@@ -50,14 +50,16 @@ use cashu_kvac::secp::Scalar;
 let scalars = (0..6).map(|_| Scalar::random()).collect();
 let mint_privkey = MintPrivateKey::from_scalars(&scalars).unwrap();
 
-// Client generates these
+// Client generates these: the amount commitment and an unguessable per-request
+// nonce (32 random bytes, stored with the coin for later recovery).
 let amount_attribute = AmountAttribute::new(10, None);
 let amount_commitment = amount_attribute.commitment();
-let tag = Scalar::random();
+let nonce = rand::random::<[u8; 32]>();
 
-// Mint issues the MAC on the tag and the commitments (amount and possibly script)
-// Returns a GroupElement representing the MAC
-let mac = MAC::generate(&mint_privkey, amount_commitment, None, tag).unwrap();
+// Mint derives the tag statelessly from (its private key, nonce, commitments) and
+// issues the MAC. Wallet-chosen tags are not accepted: a repeated tag would allow
+// combining two issued MACs into a forgery over an arbitrary amount.
+let (tag, mac) = MAC::generate(&mint_privkey, &nonce, amount_commitment, None).unwrap();
 
 ```
 
