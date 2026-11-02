@@ -181,20 +181,20 @@ impl Scalar {
     ///
     /// A mutable reference to `self`.
     pub fn tweak_add(&mut self, other: &Scalar) -> &Self {
-        if other.inner.is_none() {
-            self
-        } else if self.inner.is_none() {
-            self.inner = Some(other.inner.unwrap());
-            self
-        } else {
-            let b = SecpScalar::from_be_bytes(other.inner.unwrap().secret_bytes()).unwrap();
-            let result_key = self
-                .inner
-                .unwrap()
-                .add_tweak(&b)
-                .expect("Could not add to Scalar");
-            self.inner = Some(result_key);
-            self
+        let Some(other_inner) = other.inner else {
+            return self;
+        };
+        match self.inner {
+            None => {
+                self.inner = Some(other_inner);
+                self
+            }
+            Some(self_inner) => {
+                let b = SecpScalar::from_be_bytes(other_inner.secret_bytes()).unwrap();
+                let result_key = self_inner.add_tweak(&b).expect("Could not add to Scalar");
+                self.inner = Some(result_key);
+                self
+            }
         }
     }
 
@@ -225,10 +225,11 @@ impl Scalar {
     ///
     /// A new `Scalar` instance representing the inverse of `self`.
     pub fn invert(self) -> Self {
-        if self.inner.is_none() {
+        let Some(inner) = self.inner else {
             panic!("Scalar 0 doesn't have an inverse")
-        } else {
-            let x = BigUint::from_bytes_be(&self.inner.unwrap().secret_bytes());
+        };
+        {
+            let x = BigUint::from_bytes_be(&inner.secret_bytes());
             let q = BigUint::from_bytes_be(&CURVE_ORDER);
             let x_inv = modinv(
                 &q.to_bigint().expect("Can convert BigUint to BigInt"),
@@ -253,10 +254,9 @@ impl Scalar {
     ///
     /// A vector of bytes representing the scalar value.
     pub fn to_bytes(&self) -> Vec<u8> {
-        if self.inner.is_none() {
-            Vec::from(SCALAR_ZERO)
-        } else {
-            Vec::from(self.inner.unwrap().secret_bytes())
+        match self.inner {
+            None => Vec::from(SCALAR_ZERO),
+            Some(inner) => Vec::from(inner.secret_bytes()),
         }
     }
 
@@ -309,19 +309,21 @@ impl GroupElement {
     ///
     /// A mutable reference to `self`.
     pub fn combine_add(&mut self, other: &GroupElement) -> &Self {
-        if other.inner.is_none() {
-            self
-        } else if self.inner.is_none() {
-            self.inner = other.inner;
-            self
-        } else {
-            let result = self
-                .inner
-                .unwrap()
-                .combine(&other.inner.unwrap())
-                .expect("Error combining GroupElements");
-            self.inner = Some(result);
-            self
+        let Some(other_inner) = other.inner else {
+            return self;
+        };
+        match self.inner {
+            None => {
+                self.inner = Some(other_inner);
+                self
+            }
+            Some(self_inner) => {
+                let result = self_inner
+                    .combine(&other_inner)
+                    .expect("Error combining GroupElements");
+                self.inner = Some(result);
+                self
+            }
         }
     }
 
@@ -338,15 +340,13 @@ impl GroupElement {
     ///
     /// A mutable reference to `self`.
     pub fn multiply(&mut self, scalar: &Scalar) -> &Self {
-        if scalar.inner.is_none() || self.inner.is_none() {
+        let (Some(scalar_inner), Some(self_inner)) = (scalar.inner, self.inner) else {
             self.inner = None;
-            self
-        } else {
-            let b = bitcoin::secp256k1::Scalar::from_be_bytes(scalar.inner.unwrap().secret_bytes())
-                .unwrap();
-            let result = self
-                .inner
-                .unwrap()
+            return self;
+        };
+        {
+            let b = bitcoin::secp256k1::Scalar::from_be_bytes(scalar_inner.secret_bytes()).unwrap();
+            let result = self_inner
                 .mul_tweak(&SECP256K1, &b)
                 .expect("Could not multiply Scalar to GroupElement");
             self.inner = Some(result);
@@ -381,10 +381,9 @@ impl GroupElement {
     ///
     /// A vector of bytes representing the group element value.
     pub fn to_bytes(&self) -> Vec<u8> {
-        if self.inner.is_none() {
-            Vec::from(GROUP_ELEMENT_ZERO)
-        } else {
-            Vec::from(self.inner.unwrap().serialize())
+        match self.inner {
+            None => Vec::from(GROUP_ELEMENT_ZERO),
+            Some(inner) => Vec::from(inner.serialize()),
         }
     }
 
@@ -475,23 +474,18 @@ impl std::ops::Mul<&Scalar> for Scalar {
 
 impl From<&Scalar> for Vec<u8> {
     fn from(val: &Scalar) -> Self {
-        if val.inner.is_none() {
-            SCALAR_ZERO.to_vec()
-        } else {
-            val.inner.unwrap().secret_bytes().to_vec()
+        match val.inner {
+            None => SCALAR_ZERO.to_vec(),
+            Some(inner) => inner.secret_bytes().to_vec(),
         }
     }
 }
 
 impl From<&Scalar> for [u8; 32] {
     fn from(val: &Scalar) -> Self {
-        if val.inner.is_none() {
-            SCALAR_ZERO
-        } else {
-            val.inner
-                .as_ref()
-                .expect("Expected inner Scalar")
-                .secret_bytes()
+        match val.inner {
+            None => SCALAR_ZERO,
+            Some(inner) => inner.secret_bytes(),
         }
     }
 }
@@ -514,10 +508,9 @@ impl From<&Scalar> for u64 {
 
 impl From<&Scalar> for String {
     fn from(val: &Scalar) -> Self {
-        if val.inner.is_none() {
-            hex::encode(SCALAR_ZERO)
-        } else {
-            hex::encode(val.inner.unwrap().secret_bytes())
+        match val.inner {
+            None => hex::encode(SCALAR_ZERO),
+            Some(inner) => hex::encode(inner.secret_bytes()),
         }
     }
 }
@@ -537,9 +530,9 @@ impl From<u64> for Scalar {
     }
 }
 
-impl TryFrom<&str> for Scalar {
-    type Error = Error;
-    fn try_from(hex_string: &str) -> Result<Self, Error> {
+impl std::str::FromStr for Scalar {
+    type Err = Error;
+    fn from_str(hex_string: &str) -> Result<Self, Error> {
         let bytes = hex::decode(hex_string)?;
         if bytes.len() > 32 {
             return Err(Error::HexStringTooLong);
@@ -550,6 +543,13 @@ impl TryFrom<&str> for Scalar {
             return Err(Error::ScalarZero);
         }
         Ok(Scalar::new(&padded_bytes))
+    }
+}
+
+impl TryFrom<&str> for Scalar {
+    type Error = Error;
+    fn try_from(hex_string: &str) -> Result<Self, Error> {
+        std::str::FromStr::from_str(hex_string)
     }
 }
 
@@ -642,9 +642,9 @@ impl std::ops::Mul<&Scalar> for GroupElement {
     }
 }
 
-impl TryFrom<&str> for GroupElement {
-    type Error = Error;
-    fn try_from(hex_string: &str) -> Result<Self, Error> {
+impl std::str::FromStr for GroupElement {
+    type Err = Error;
+    fn from_str(hex_string: &str) -> Result<Self, Error> {
         let bytes = hex::decode(hex_string)?;
         if bytes.len() > 33 {
             return Err(Error::HexStringTooLong);
@@ -658,30 +658,27 @@ impl TryFrom<&str> for GroupElement {
     }
 }
 
+impl TryFrom<&str> for GroupElement {
+    type Error = Error;
+    fn try_from(hex_string: &str) -> Result<Self, Error> {
+        std::str::FromStr::from_str(hex_string)
+    }
+}
+
 impl From<&GroupElement> for [u8; 33] {
     fn from(val: &GroupElement) -> Self {
-        if val.inner.is_none() {
-            GROUP_ELEMENT_ZERO
-        } else {
-            val.inner
-                .as_ref()
-                .expect("Expected inner PublicKey")
-                .serialize()
+        match val.inner {
+            None => GROUP_ELEMENT_ZERO,
+            Some(inner) => inner.serialize(),
         }
     }
 }
 
 impl From<&GroupElement> for String {
     fn from(val: &GroupElement) -> Self {
-        if val.inner.is_none() {
-            hex::encode(GROUP_ELEMENT_ZERO)
-        } else {
-            hex::encode(
-                val.inner
-                    .as_ref()
-                    .expect("Expected inner PublicKey")
-                    .serialize(),
-            )
+        match val.inner {
+            None => hex::encode(GROUP_ELEMENT_ZERO),
+            Some(inner) => hex::encode(inner.serialize()),
         }
     }
 }
