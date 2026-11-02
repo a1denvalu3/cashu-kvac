@@ -956,7 +956,14 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.commitment(), None).map(|(_t, v)| v).expect("MAC expected")
+                MAC::generate(
+                    &privkey,
+                    &<[u8; 32]>::from(tag.as_ref()),
+                    input.commitment(),
+                    None,
+                )
+                .map(|(_t, v)| v)
+                .expect("MAC expected")
             })
             .collect();
         let proof = BalanceProof::create(&inputs, &outputs, &mut client_transcript);
@@ -997,7 +1004,14 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.commitment(), None).map(|(_t, v)| v).expect("MAC expected")
+                MAC::generate(
+                    &privkey,
+                    &<[u8; 32]>::from(tag.as_ref()),
+                    input.commitment(),
+                    None,
+                )
+                .map(|(_t, v)| v)
+                .expect("MAC expected")
             })
             .collect();
         let proof = BalanceProof::create(&inputs, &outputs, &mut client_transcript);
@@ -1058,7 +1072,13 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.0.commitment(), Some(input.1.commitment())).map(|(_t, v)| v)
+                MAC::generate(
+                    &privkey,
+                    &<[u8; 32]>::from(tag.as_ref()),
+                    input.0.commitment(),
+                    Some(input.1.commitment()),
+                )
+                .map(|(_t, v)| v)
                 .expect("MAC expected")
             })
             .collect();
@@ -1131,7 +1151,13 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.0.commitment(), Some(input.1.commitment())).map(|(_t, v)| v)
+                MAC::generate(
+                    &privkey,
+                    &<[u8; 32]>::from(tag.as_ref()),
+                    input.0.commitment(),
+                    Some(input.1.commitment()),
+                )
+                .map(|(_t, v)| v)
                 .expect("MAC expected")
             })
             .collect();
