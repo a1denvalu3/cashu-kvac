@@ -118,7 +118,11 @@ We use the blinding term $r_a$ used for `AmountAttribute` and compute:
 
 * $U = \text{HashToCurve}(t)$, where $t$ is the `MAC` scalar value
 * $C_a = r_a\cdot G_\text{zamount} + M_a$
-* $C_s = r_a\cdot G_\text{zscript} + M_s$
+* $C_s = r_a\cdot G_\text{zscript} + M_s$ on the hidden path, or
+  $C_s = r_a\cdot G_\text{zscript} + r_s\cdot G_\text{blind}$ when the script will be
+  revealed (the Mint adds $s\cdot G_\text{script}$ itself at verification; the proof's
+  $C_s$ equation correspondingly drops its $G_\text{script}$ witness term so the
+  revealed script is bound to the issued one — see the Swap section below).
 * $C_{x_0} = r_a\cdot G_{x_0} + U$
 * $C_{x_1} = r_a\cdot G_{x_1} + t\cdot U$
 * $C_v = r_a\cdot G_\text{zmac} + V$, where $V$ is the `MAC` public point value
@@ -381,6 +385,14 @@ The Mint then [(89-105)](https://github.com/lollerfirst/cashu-kvac/blob/14024615
 5. Hashes the provided script to a scalar value $s = H(\text{script})$ and "completes"
    the randomized script commitment value $C_s' = C_s + s \cdot G_\text{script}$.
 3. Verifies all proofs, including the `MacProof` with the modified $C_s'$.
+   On this reveal path the $C_s$ equation of `MacProof` omits the $s \cdot G_\text{script}$
+   witness term: the statement is $C_s = r_a \cdot G_\text{zscript} + r_s \cdot G_\text{blind}$.
+   Since the Mint adds the only $G_\text{script}$ term itself (via $s = H(\text{script})$),
+   the equality the proof pins down is exactly that the revealed script hashes to the
+   script the MAC was issued over. (An earlier version of the statement kept a free
+   $G_\text{script}$ witness here; a holder could then absorb
+   $s_\text{issued} - s_\text{revealed}$ into $C_s$ and make a coin bound to script $A$
+   verify while revealing an unrelated script $B$.)
 4. If all verifications are successful, the Mint issues new `MAC`s for the outputs commitment pairs [(108)](https://github.com/lollerfirst/cashu-kvac/blob/14024615471e3d6cb328bade1db0db3e6d67fd38/examples/full_interaction.py#L108). As with the `BootstrapRequest`, the Mint also produces $\pi_\text{iparams}$ to prove to the wallet its private key usage [(109)](https://github.com/lollerfirst/cashu-kvac/blob/14024615471e3d6cb328bade1db0db3e6d67fd38/examples/full_interaction.py#L109).
 
 ### Wallet-to-Wallet

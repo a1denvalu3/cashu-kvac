@@ -147,6 +147,7 @@ impl MacProof {
         scriptAttribute: JsValue,
         tag: JsValue,
         randomizedCoin: JsValue,
+        revealScript: bool,
         transcript: &mut CashuTranscript,
     ) -> Result<JsValue, JsError> {
         let mintPubkey: MintPublicKey = MintPublicKey::fromJSON(mintPublickey)?;
@@ -162,6 +163,7 @@ impl MacProof {
             scriptAttr.as_ref(),
             tag,
             &randomizedComms,
+            revealScript,
             transcript,
         )
         .toJSON())
