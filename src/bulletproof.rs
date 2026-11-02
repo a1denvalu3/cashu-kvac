@@ -241,7 +241,7 @@ impl InnerProductArgument {
         for (L, R) in self
             .recursion_inputs_left
             .into_iter()
-            .zip(self.recursion_inputs_right.into_iter())
+            .zip(self.recursion_inputs_right)
         {
             transcript.append_element(b"IPA_L_", &L);
             transcript.append_element(b"IPA_R_", &R);
@@ -256,7 +256,7 @@ impl InnerProductArgument {
         // to O(n) by unrolling the prover's loop (we can do that since have the challenges)
         // and performing the O(log_2(n)) arithmetic operations on scalars instead.
         let mut G_aH_b = GENERATORS.O;
-        for (i, (G_i, H_i)) in G_.into_iter().zip(H_.into_iter()).enumerate() {
+        for (i, (G_i, H_i)) in G_.into_iter().zip(H_).enumerate() {
             let mut s = Scalar::new(&SCALAR_ONE);
             for (j, x) in challenges.iter().rev().enumerate() {
                 // Use x if the j-th bit of i is 1

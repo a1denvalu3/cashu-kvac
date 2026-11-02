@@ -67,7 +67,7 @@ impl<'a> SchnorrProver<'a> {
             let V = equation.lhs;
 
             for row in equation.take_rhs().into_iter() {
-                for (k, P) in self.random_terms.iter().zip(row.into_iter()) {
+                for (k, P) in self.random_terms.iter().zip(row) {
                     R = R + (P * k).as_ref();
                 }
             }
@@ -91,7 +91,7 @@ impl<'a> SchnorrProver<'a> {
 
         // Create responses to the challenge
         let mut responses: Vec<Scalar> = vec![];
-        for (k, s) in self.random_terms.into_iter().zip(self.secrets.into_iter()) {
+        for (k, s) in self.random_terms.into_iter().zip(self.secrets) {
             responses.push(k + (s * c.as_ref()).as_ref());
         }
 
@@ -143,7 +143,7 @@ impl<'a> SchnorrVerifier<'a> {
             let V = equation.lhs;
 
             for row in equation.take_rhs().into_iter() {
-                for (s, P) in self.responses.iter().zip(row.into_iter()) {
+                for (s, P) in self.responses.iter().zip(row) {
                     R = R + (P * s).as_ref();
                 }
             }
