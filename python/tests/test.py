@@ -1,4 +1,5 @@
 from src.kvac import *
+import os
 from src.transcript import CashuTranscript
 from src.models import *
 from src.secp import Scalar
@@ -26,7 +27,7 @@ def test_iparams(transcripts, mint_privkey):
     attribute = AmountAttribute.create(16)
 
     # Mint verifies: range proof, balance proof and issues a MAC with a proof of mint_publickey. 
-    mac = MAC.generate(mint_privkey, attribute.Ma)
+    mac = MAC.generate(mint_privkey, os.urandom(32), attribute.Ma)
     proof = prove_iparams(mint_transcript, mint_privkey, mac, attribute.Ma)
 
     # User verifies mint_publickey for issued attribute
@@ -43,7 +44,7 @@ def test_wrong_iparams(transcripts, mint_privkey):
     attribute = AmountAttribute.create(16)
 
     # Mint verifies: range proof, balance proof and issues a MAC with a proof of mint_publickey. 
-    mac = MAC.generate(mint_privkey, attribute.Ma)
+    mac = MAC.generate(mint_privkey, os.urandom(32), attribute.Ma)
     proof = prove_iparams(mint_transcript, different_mint_privkey, mac, attribute.Ma)
 
     # User verifies mint_publickey for issued attribute
@@ -57,7 +58,7 @@ def test_mac(transcripts, mint_privkey):
     attribute = AmountAttribute.create(16)
 
     # Mint generates MAC
-    mac = MAC.generate(mint_privkey, attribute.Ma)
+    mac = MAC.generate(mint_privkey, os.urandom(32), attribute.Ma)
 
     # User randomizes commitment and produces proof of MAC for it
     credentials = RandomizedCredentials.create(mac, attribute)
@@ -72,7 +73,7 @@ def test_different_randomization(transcripts, mint_privkey):
     attribute = AmountAttribute.create(16)
 
     # Mint generates MAC
-    mac = MAC.generate(mint_privkey, attribute.Ma)
+    mac = MAC.generate(mint_privkey, os.urandom(32), attribute.Ma)
 
     # user tries to randomize with another scalar
     k = Scalar()
@@ -95,7 +96,7 @@ def test_balance(transcripts, mint_privkey):
     # User creates 1 attribute worth 16
     attribute = AmountAttribute.create(16)
 
-    mac = MAC.generate(mint_privkey, attribute.Ma)
+    mac = MAC.generate(mint_privkey, os.urandom(32), attribute.Ma)
     credentials = RandomizedCredentials.create(mac, attribute)
     
     # Compute another credential worth 8
@@ -118,7 +119,7 @@ def test_wrong_balance(transcripts, mint_privkey):
     # User creates 1 attribute worth 16
     attribute = AmountAttribute.create(16)
 
-    mac = MAC.generate(mint_privkey, attribute.Ma)
+    mac = MAC.generate(mint_privkey, os.urandom(32), attribute.Ma)
     credentials = RandomizedCredentials.create(mac, attribute)
     
     # Compute another credential worth 8
@@ -181,7 +182,7 @@ def test_script(transcripts, mint_privkey):
     script = random.randbytes(32)
     script_attr = ScriptAttribute.create(script)
     new_script_attr = [ScriptAttribute.create(script) for _ in range(6)]
-    mac = MAC.generate(mint_privkey, amount_attr.Ma, script_attr.Ms)
+    mac = MAC.generate(mint_privkey, os.urandom(32), amount_attr.Ma, script_attr.Ms)
     randomized_creds = RandomizedCredentials.create(mac, amount_attr, script_attr)
     script_proof = prove_script_equality(cli_transcript, [amount_attr], [script_attr], new_script_attr)
     assert verify_script_equality(mint_transcript, [randomized_creds], [att.Ms for att in new_script_attr], script_proof)
@@ -192,7 +193,7 @@ def test_wrong_script(transcripts, mint_privkey):
     script = random.randbytes(32)
     script_attr = ScriptAttribute.create(script)
     new_script_attr = [ScriptAttribute.create(b'\x99') for _ in range(6)]
-    mac = MAC.generate(mint_privkey, amount_attr.Ma, script_attr.Ms)
+    mac = MAC.generate(mint_privkey, os.urandom(32), amount_attr.Ma, script_attr.Ms)
     randomized_creds = RandomizedCredentials.create(mac, amount_attr, script_attr)
     script_proof = prove_script_equality(cli_transcript, [amount_attr], [script_attr], new_script_attr)
     assert not verify_script_equality(mint_transcript, [randomized_creds], [att.Ms for att in new_script_attr], script_proof)

@@ -1,4 +1,5 @@
 from kvac import *
+import os
 from transcript import CashuTranscript
 from secp import Scalar
 from models import *
@@ -54,7 +55,7 @@ proof_bootstrap = prove_bootstrap(client_tscr, bootstrap)
 assert verify_bootstrap(mint_tscr, bootstrap.Ma, proof_bootstrap), (
     "Couldn't verify bootstrap attr"
 )
-mac_0 = MAC.generate(mint_privkey, bootstrap.Ma, script_attr.Ms)
+mac_0 = MAC.generate(mint_privkey, os.urandom(32), bootstrap.Ma, script_attr.Ms)
 proof_iparams = prove_iparams(mint_tscr, mint_privkey, mac_0, bootstrap.Ma, script_attr.Ms)
 
 ## RECEIVE(mac_0, proof_iparams)
@@ -106,7 +107,7 @@ assert verify_script_equality(mint_tscr, [randomized_creds], [new_script_attr.Ms
 )
 
 # Then Mint can safely issue new credentials now
-mac_16 = MAC.generate(mint_privkey, attr_16.Ma, new_script_attr.Ms)
+mac_16 = MAC.generate(mint_privkey, os.urandom(32), attr_16.Ma, new_script_attr.Ms)
 proof_iparams = prove_iparams(mint_tscr, mint_privkey, mac_16, attr_16.Ma, new_script_attr.Ms)
 
 ## RECEIVE(mac_16, proof_iparams)

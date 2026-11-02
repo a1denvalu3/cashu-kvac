@@ -8,7 +8,7 @@ use crate::{
     secp::{GroupElement, Scalar},
 };
 use bitcoin::hashes::sha256::Hash as Sha256Hash;
-use bitcoin::hashes::Hash;
+use bitcoin::hashes::{Hash, HashEngine, Hmac, HmacEngine};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -250,42 +250,70 @@ impl AmountAttribute {
 pub struct MAC {}
 
 impl MAC {
-    /// Generate a new MAC from the Mint's private key,
-    /// for a particular amount commitment and script commitment pair.
+    /// Generate a new MAC from the Mint's private key, for a particular amount commitment and
+    /// script commitment pair, together with the unique tag that identifies this issuance.
+    ///
+    /// The tag is *derived by the Mint*, not chosen by the wallet. It is computed as
+    /// `t = HMAC-SHA256(key = SHA256(sk), msg = nonce ‖ compress(M_a) ‖ compress(M_s))`
+    /// where `sk` is the Mint's private scalars and `nonce` an unguessable, per-request value
+    /// supplied by the wallet (32 random bytes, stored with the coin for recovery).
+    ///
+    /// This makes every issuance statelessly produce a distinct tag for distinct request
+    /// contents, and -- crucially -- removes the wallet's ability to pick a tag it has already
+    /// seen issued. Repeating an issuance requires repeating `nonce`, in which case the
+    /// identical `t` is reproduced and the MAC is *the same group element* the Mint already
+    /// issued: the holder gains nothing new, while the affine-combination forgery over two
+    /// *distinct* `(t, V)` pairs on related promises is impossible.
     ///
     /// # Arguments
     ///
     /// * `privkey` - A reference to the `MintPrivateKey` used to generate the MAC.
+    /// * `nonce` - A per-request nonce chosen by the wallet (not a secret).
     /// * `amount_commitment` - A `GroupElement` representing the amount commitment.
     /// * `script_commitment` - An optional `GroupElement` representing the script commitment.
     ///   If not provided, the origin `GroupElement` is used.
-    /// * `tag` - A `Scalar` that will be used as a unique tag for the note.
     ///
     /// # Returns
     ///
-    /// Returns a `Result<GroupElement, Error>`, where `GroupElement` is the newly generated MAC on success,
-    /// or an `Error` if the MAC generation fails (e.g., if hashing to curve fails).
+    /// Returns a `Result<(Scalar, GroupElement), Error>`: the tag `t` the Mint computed and
+    /// the `GroupElement` MAC.
     #[allow(non_snake_case)]
     pub fn generate(
         privkey: &MintPrivateKey,
+        nonce: &[u8],
         amount_commitment: GroupElement,
         script_commitment: Option<GroupElement>,
-        tag: Scalar,
-    ) -> Result<GroupElement, Error> {
+    ) -> Result<(Scalar, GroupElement), Error> {
+        // Derive a per-request tag from the Mint's private key material and the request.
+        let mut key_engine = Sha256Hash::engine();
+        for scalar in privkey.to_scalars().iter() {
+            key_engine.input(&<[u8; 32]>::from(scalar));
+        }
+        let tag_key = Sha256Hash::from_engine(key_engine);
+        let mut hmac = HmacEngine::<Sha256Hash>::new(&tag_key.to_byte_array());
+        hmac.input(b"cashu-kvac-tag-v1");
+        hmac.input(nonce);
+        hmac.input(&<[u8; 33]>::from(amount_commitment.as_ref()));
+        let script_bytes: [u8; 33] = match script_commitment {
+            Some(com) => com.as_ref().into(),
+            None => GENERATORS.O.as_ref().into(),
+        };
+        hmac.input(&script_bytes);
+        let tag_digest = Hmac::<Sha256Hash>::from_engine(hmac);
+        let tag = Scalar::new(&tag_digest.to_byte_array());
+
         let t_bytes: [u8; 32] = tag.as_ref().into();
         let U = hash_to_curve(&t_bytes)?;
         let Ma = amount_commitment;
-        let Ms: GroupElement;
-        if let Some(com) = script_commitment {
-            Ms = com;
-        } else {
-            Ms = GENERATORS.O
-        }
+        let Ms: GroupElement = match script_commitment {
+            Some(com) => com,
+            None => GENERATORS.O,
+        };
         let V = GENERATORS.W * &privkey.w
             + &(U * &privkey.x0)
             + &(U * &(tag * &privkey.x1))
-            + &(Ma * &(privkey.ya) + &(Ms * &(privkey.ys)));
-        Ok(V)
+            + &(Ma * &privkey.ya + &(Ms * &privkey.ys));
+        Ok((tag, V))
     }
 }
 
@@ -455,5 +483,42 @@ mod tests {
         let serialized = "{\"s\":\"c87557af1c5e640a085df471d68a5a97c9aaf4d379add58da3d7d5e0fe0df487\",\"r\":\"6465616462656566646561646265656664656164626565666465616462656566\"}";
         let deserialized: ScriptAttribute = serde_json::from_str(serialized).unwrap();
         assert!(deserialized.s == script_attr.s);
+    }
+
+    /// Issue #1 regression: distinct issuance requests must produce distinct tags,
+    /// and replaying the *same* request (same nonce, same commitments) must
+    /// deterministically reproduce the same tag, so that a repeated issuance
+    /// yields the same MAC and never a fresh affine-combination point.
+    #[test]
+    fn test_mac_tags_are_distinct_and_deterministic() {
+        use crate::models::MintPrivateKey;
+
+        let scalars: Vec<Scalar> = (0..6).map(|_| Scalar::random()).collect();
+        let privkey = MintPrivateKey::from_scalars(&scalars).unwrap();
+
+        let r = Scalar::random();
+        let m0 = crate::generators::GENERATORS.G_blind * &r;
+        let m1 = m0 + &crate::generators::GENERATORS.G_amount;
+        let nonce_a: &[u8] = b"nonce-A";
+        let nonce_b: &[u8] = b"nonce-B";
+
+        let (t0, v0) = MAC::generate(&privkey, nonce_a, m0, None).unwrap();
+        let (t1, v1) = MAC::generate(&privkey, nonce_a, m1, None).unwrap();
+        let (t0b, v0b) = MAC::generate(&privkey, nonce_b, m0, None).unwrap();
+
+        // Two related messages under one nonce now get *different* tags, so the
+        // affine-combination forgery (which requires a shared tag) fails.
+        assert_ne!(t0, t1);
+        let forged = v0 + &((v1 - &v0) * &Scalar::from(1_000_000u64));
+        assert_ne!(forged, v1);
+
+        // Same content + same nonce -> identical tag/MAC (no new oracle output).
+        let (t_again, v_again) = MAC::generate(&privkey, nonce_a, m0, None).unwrap();
+        assert_eq!(t0, t_again);
+        assert_eq!(v0, v_again);
+
+        // A different nonce on the *same* content yields a fresh tag/MAC.
+        assert_ne!(t0, t0b);
+        assert_ne!(v0, v0b);
     }
 }

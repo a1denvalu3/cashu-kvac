@@ -76,18 +76,30 @@ Equivalent to Cashu's `BlindedSignature`.
 
 The Mint generates this algebraic MAC using its secret parameters (`sk`) after verifying `RandomizedCoins` (see section Protocol). This MAC binds the `AmountAttribute` and `ScriptAttribute` together, ensuring neither can be presented alone.
 
-Here $t$ can be picked by both the Mint or the wallet. If the wallet picks it, they will have to send it together with the `AmountAttribute` (and possibly `ScriptAttribute`).
-
-The main advantage of letting the wallet derive $t$ from seed is that we
-can later leverage this for a recovery scheme that does not leak information to the Mint.
+The tag $t$ is derived by the Mint, never chosen by the wallet. Letting the wallet
+pick $t$ allows a key attack: two MACs under one tag on $M_0$ and $M_0 + G_\text{amount}$
+satisfy $V_1 - V_0 = y_a \cdot G_\text{amount}$, so $V_0 + k\cdot(V_1 - V_0)$ is a valid
+MAC on an attribute encoding *any* $k$. Mint-side derivation closes this: the wallet
+commits to its request contents before learning $t$, matching the fresh-issuer-chosen
+tag assumption of the MAC's security proof (Chase–Perrin–Zaverucha, CCS 2020,
+Theorem 10).
 
 Composition:
-* $t \overset{\\$}\leftarrow Z_q$ (Mint) or $t \leftarrow \text{HMAC-SHA2}(\text{seed}, \text{"t"}, \text{derivation})$ (wallet)
+* the wallet picks an unguessable per-request nonce $\rho$ (32 random bytes), stored with the coin
+* $t \leftarrow \text{HMAC-SHA2}(\text{SHA256}(sk),\ \text{"cashu-kvac-tag-v1"} \,\|\, \rho \,\|\, M_a \,\|\, M_s)$ (Mint)
 * $M_a$ from `AmountAttribute`
 * $M_s$ from `ScriptAttribute` or point at infinity if no script.
 * $U = \text{HashToCurve}(t)$
 * $V = w\cdot G_w + x_0\cdot U + x_1tU + y_a\cdot M_a + y_s\cdot M_s$
 * MAC: $(t, V)$
+
+Because $t$ is a deterministic function of the Mint's key material and the full
+issuance request, distinct requests yield distinct tags *statelessly* — the Mint
+needs no per-tag uniqueness database. Repeating an identical request $(\rho, M_a, M_s)$
+reproduces the identical $(t, V)$, returning the same group element the Mint already
+issued and nothing new. Since $t$ is re-derivable from $(\rho, M_a, M_s)$, the wallet
+can later regenerate it during recovery by re-presenting those values
+(see [Deterministic Recovery](deterministic_recovery.md)).
 
 ### Coin
 We consider the `MAC` together with `AmountAttribute` and `ScriptAttribute` to be a `Coin`.

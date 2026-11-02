@@ -1,4 +1,5 @@
 import timeit
+import os
 import random
 from src.kvac import *
 
@@ -15,7 +16,7 @@ mint_tscr = CashuTranscript()
 
 bootstrap = AmountAttribute.create(0)
 script_attr = ScriptAttribute.create(b"\x00"*32)
-mac_0 = MAC.generate(mint_privkey, bootstrap.Ma, script_attr.Ms)
+mac_0 = MAC.generate(mint_privkey, os.urandom(32), bootstrap.Ma, script_attr.Ms)
 
 attr_16 = AmountAttribute.create(16)
 new_script_attr = ScriptAttribute.create(b"\x00"*32)

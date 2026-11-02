@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from .secp import GroupElement, Scalar
 from typing import List, Optional, Dict, Tuple
 from .generators import *
@@ -145,35 +147,43 @@ class MAC:
     def generate(
         cls,
         privkey: MintPrivateKey,
+        nonce: bytes,
         attribute: GroupElement,
         script: Optional[GroupElement] = None,
-        t: Optional[Scalar] = None,
     ):
         """
-        Generates a MAC for a given attribute and secret key.
+        Issue a MAC for the given amount/script commitments.
 
-        This function takes as input an attribute and a secret key, and returns a MAC that can be used to authenticate the attribute.
+        The tag is *derived by the Mint* as
+            t = HMAC-SHA256(key = SHA256(sk), msg = "cashu-kvac-tag-v1" || nonce || Ma || Ms)
+        so every distinct issuance yields a distinct tag statelessly, and the
+        wallet can no longer pick a tag it has already seen issued. Repeating an
+        issuance requires repeating ``nonce``; that deterministically reproduces
+        the same tag/MAC pair, so the affine-combination forgery over two
+        distinct (t, V) MACs on related commitments is impossible.
 
         Parameters:
             privkey (MintPrivateKey): The mint's secret parameters.
+            nonce (bytes): A per-request nonce chosen by the wallet.
             attribute (GroupElement): The amount attribute.
-            script (GroupElement): The script attribute.
-            t (Optional[Scalar])
-             
+            script (Optional[GroupElement]): The optional script commitment.
+
         Returns:
-            MAC: The generated MAC.
+            MAC: The generated MAC (tag, V).
         """
-        if not t:
-            t = Scalar()
         sk = privkey.sk
+        sk_bytes = b"".join(int(x).to_bytes(32, "big") for x in sk)
+        tag_key = hashlib.sha256(sk_bytes).digest()
         Ma = attribute
         Ms = script if script else O
+        msg = b"cashu-kvac-tag-v1" + nonce + Ma.serialize(True) + Ms.serialize(True)
+        t = Scalar(hmac.new(tag_key, msg, hashlib.sha256).digest())
         U = hash_to_curve(t.to_bytes())
         V = (
             sk[0] * W
             + sk[2] * U
             + sk[3] * t * U
-            + sk[4] * Ma 
+            + sk[4] * Ma
             + sk[5] * Ms
         )
         return cls(t=t, V=V)
