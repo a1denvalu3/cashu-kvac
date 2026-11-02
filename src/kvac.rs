@@ -68,7 +68,7 @@ impl<'a> SchnorrProver<'a> {
 
             for row in equation.take_rhs().into_iter() {
                 for (k, P) in self.random_terms.iter().zip(row) {
-                    R = R + (P * k).as_ref();
+                    R += (P * k).as_ref();
                 }
             }
 
@@ -144,7 +144,7 @@ impl<'a> SchnorrVerifier<'a> {
 
             for row in equation.take_rhs().into_iter() {
                 for (s, P) in self.responses.iter().zip(row) {
-                    R = R + (P * s).as_ref();
+                    R += (P * s).as_ref();
                 }
             }
             R = R - (V * self.challenge.as_ref()).as_ref();
@@ -586,11 +586,11 @@ impl BalanceProof {
     ) -> ZKP {
         let mut r_sum = Scalar::new(&SCALAR_ZERO);
         for input in inputs.iter() {
-            r_sum = r_sum + &input.r;
+            r_sum += &input.r;
         }
         let mut r_sum_ = Scalar::new(&SCALAR_ZERO);
         for output in outputs.iter() {
-            r_sum_ = r_sum_ + &output.r;
+            r_sum_ += &output.r;
         }
         let delta_r = (-r_sum_) + r_sum.as_ref();
         let B = GENERATORS.Gz_attribute * r_sum.as_ref()
@@ -625,7 +625,7 @@ impl BalanceProof {
             B.negate();
         }
         for input in inputs.iter() {
-            B = B + input.Ca.as_ref();
+            B += input.Ca.as_ref();
         }
         for output in outputs.iter() {
             B = B - output;
@@ -775,11 +775,27 @@ impl RangeProof {
         RangeZKP::BULLETPROOF(bulletproof)
     }
 
+    /// Creates a SharpPoSO (relaxed-soundness) range proof for the given attributes.
+    ///
+    /// Unlike `create_bulletproof` — which targets the fixed `RANGE_LIMIT = 2^32 − 1`
+    /// range — SharpPoSO requires the caller to supply the `SharpParams` (derived via
+    /// `SharpParams::new(range_max, attributes.len())`), so the range and batch size
+    /// are explicit rather than implicit. See `crate::sharp` for the soundness
+    /// semantics and caveats.
+    pub fn create_sharp(
+        transcript: &mut CashuTranscript,
+        attributes: &[AmountAttribute],
+        params: &crate::sharp::SharpParams,
+    ) -> Result<RangeZKP, Error> {
+        let sharp = crate::sharp::SharpPOSO::new(transcript, attributes, params)?;
+        Ok(RangeZKP::SHARPPOSO(sharp))
+    }
+
     /// Verifies a range proof against the provided attribute commitments.
     ///
     /// # Parameters
     /// - `transcript`: A mutable reference to a `CashuTranscript` used for the verification process.
-    /// - `attribute_commitments`: A vector of tuples containing `GroupElement` amount commitments to be verified.
+    /// - `attribute_commitments`: amount commitments to be verified.
     /// - `proof`: A `RangeZKP` representing the range proof to be verified.
     ///
     /// # Returns
@@ -792,6 +808,15 @@ impl RangeProof {
         match proof {
             RangeZKP::BULLETPROOF(bulletproof) => {
                 bulletproof.verify(transcript, attribute_commitments)
+            }
+            RangeZKP::SHARPPOSO(sharp) => {
+                match crate::sharp::SharpParams::new(
+                    crate::models::RANGE_LIMIT,
+                    attribute_commitments.len() as u64,
+                ) {
+                    Ok(params) => sharp.verify(transcript, attribute_commitments, &params),
+                    Err(_) => false,
+                }
             }
         }
     }

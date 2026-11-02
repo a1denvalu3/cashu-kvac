@@ -79,7 +79,7 @@ fn pad_ones(mut l: Vec<Scalar>, to: usize) -> Vec<Scalar> {
 fn inner_product(l: &[Scalar], r: &[Scalar]) -> Scalar {
     let mut result = Scalar::from(0);
     for (left, right) in l.iter().zip(r.iter()) {
-        result = result + (*left * right).as_ref();
+        result += (*left * right).as_ref();
     }
     result
 }
@@ -137,7 +137,7 @@ impl InnerProductArgument {
                 b[n..].iter(),
                 H_[..n].iter()
             ) {
-                L = L + &(*G_i * a_i + &(*H_i * b_i))
+                L += &(*G_i * a_i + &(*H_i * b_i))
             }
             let mut R = U_ * &c_right;
             for (a_i, G_i, b_i, H_i) in izip!(
@@ -146,7 +146,7 @@ impl InnerProductArgument {
                 b[..n].iter(),
                 H_[n..2 * n].iter()
             ) {
-                R = R + &(*G_i * a_i + &(*H_i * b_i))
+                R += &(*G_i * a_i + &(*H_i * b_i))
             }
 
             // Prover -> Verifier : L, R
@@ -224,7 +224,7 @@ impl InnerProductArgument {
         // Switch generator U
         let U_ = U_ * &tetha;
         // Tweak commitment P
-        P = P + &(U_ * &c);
+        P += &(U_ * &c);
         // ## END PROTOCOL 1 ##
 
         // ## PROTOCOL 2 ##
@@ -349,7 +349,7 @@ impl BulletProof {
             a_right.iter(),
             H_.clone().into_iter()
         ) {
-            A = A + &(G_i * a_l_i + &(H_i * a_r_i));
+            A += &(G_i * a_l_i + &(H_i * a_r_i));
         }
 
         // s_l and s_r are the bits commitment blinding vectors
@@ -367,7 +367,7 @@ impl BulletProof {
             s_r.iter(),
             H_.clone().into_iter()
         ) {
-            S = S + &(G_i * s_l_i + &(H_i * s_r_i));
+            S += &(G_i * s_l_i + &(H_i * s_r_i));
         }
 
         // Prover -> Verifier: A, S
@@ -402,8 +402,7 @@ impl BulletProof {
 
         let mut delta_y_z = Scalar::new(&SCALAR_ZERO);
         for (i, y_i) in y_list.iter().enumerate() {
-            delta_y_z =
-                delta_y_z + &(p * y_i + &(z_list[3] * &z_list[i / n] * &POWERS_OF_TWO[i % n]));
+            delta_y_z += &(p * y_i + &(z_list[3] * &z_list[i / n] * &POWERS_OF_TWO[i % n]));
         }
 
         // l(X) and r(X) linear vector polynomials   (70-71)
@@ -470,7 +469,7 @@ impl BulletProof {
         let mut tau_0 = Scalar::new(&SCALAR_ZERO);
         let z_2 = z_list[2];
         for (attribute_pair, z_j) in izip!(attributes.iter(), z_list.into_iter()) {
-            tau_0 = tau_0 + &(z_j * &attribute_pair.r);
+            tau_0 += &(z_j * &attribute_pair.r);
         }
         tau_0 = tau_0 * &z_2;
         let tau_x = tau_0 + &(tau_1 * &x) + &(tau_2 * &x_2);
@@ -584,8 +583,7 @@ impl BulletProof {
 
         let mut delta_y_z = Scalar::new(&SCALAR_ZERO);
         for (i, y_i) in y_list.iter().enumerate() {
-            delta_y_z =
-                delta_y_z + &(p * y_i + &(z_list[3] * &z_list[i / n] * &POWERS_OF_TWO[i % n]));
+            delta_y_z += &(p * y_i + &(z_list[3] * &z_list[i / n] * &POWERS_OF_TWO[i % n]));
         }
 
         // Prover -> Verifier: T_1, T_2
@@ -605,7 +603,7 @@ impl BulletProof {
         // Check that t_x = t(x) = t_0 + t_1*x + t_2*x^2     (72)
         let mut V_z_m = GENERATORS.O;
         for (commitment_pair, z_j) in izip!(attribute_commitments.iter(), z_list.iter()) {
-            V_z_m = V_z_m + &(*commitment_pair * z_j);
+            V_z_m += &(*commitment_pair * z_j);
         }
         if GENERATORS.G_amount * &t_x + &(GENERATORS.G_blind * &tau_x)
             != V_z_m * &z_list[2] + &(GENERATORS.G_amount * &delta_y_z) + &(T1 * &x) + &(T2 * &x_2)

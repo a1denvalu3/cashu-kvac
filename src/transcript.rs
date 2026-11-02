@@ -5,6 +5,7 @@ use crate::secp::{GroupElement, Scalar};
 
 /// A wrapper around `merlin::Transcript` for Fiat-Shamir transformations.
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct CashuTranscript {
     inner: Transcript,
 }

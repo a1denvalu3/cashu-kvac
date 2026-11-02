@@ -5,5 +5,6 @@ pub mod kvac;
 pub mod models;
 pub mod recovery;
 pub mod secp;
+pub mod sharp;
 pub mod transcript;
 pub mod wasm;
