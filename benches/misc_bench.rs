@@ -29,13 +29,13 @@ fn bench_mac_generation(bencher: &mut Bencher) {
     let mint_privkey = privkey();
     let amount_attr = AmountAttribute::new(10, None);
     let script_attr = ScriptAttribute::new(b"3c83", None);
-    let tag = Scalar::random();
+    let nonce: [u8; 32] = Scalar::random().as_ref().into();
     bencher.iter(|| {
         MAC::generate(
             &mint_privkey,
+            &nonce,
             amount_attr.commitment(),
             Some(script_attr.commitment()),
-            tag,
         )
     });
 }
@@ -45,12 +45,12 @@ fn bench_randomized_commitments_generation(bencher: &mut Bencher) {
     let mint_privkey = privkey();
     let amount_attr = AmountAttribute::new(10, None);
     let script_attr = ScriptAttribute::new(b"3c83", None);
-    let tag = Scalar::random();
-    let mac = MAC::generate(
+    let nonce: [u8; 32] = Scalar::random().as_ref().into();
+    let (tag, mac) = MAC::generate(
         &mint_privkey,
+        &nonce,
         amount_attr.commitment(),
         Some(script_attr.commitment()),
-        tag,
     )
     .unwrap();
     bencher.iter(|| {

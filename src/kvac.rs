@@ -819,8 +819,9 @@ mod tests {
     fn test_iparams() {
         let mint_privkey = privkey();
         let amount_attr = AmountAttribute::new(12, None);
-        let tag = Scalar::random();
-        let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+        let nonce = Scalar::random();
+        let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+        let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
             .expect("Couldn't generate MAC");
         let proof = IssuanceProof::create(&mint_privkey, tag, mac, amount_attr.commitment(), None);
         tag.invert();
@@ -839,8 +840,9 @@ mod tests {
         let mint_privkey = privkey();
         let mint_privkey_1 = privkey();
         let amount_attr = AmountAttribute::new(12, None);
-        let tag = Scalar::random();
-        let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+        let nonce = Scalar::random();
+        let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+        let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
             .expect("Couldn't generate MAC");
         let proof = IssuanceProof::create(&mint_privkey, tag, mac, amount_attr.commitment(), None);
         assert!(!IssuanceProof::verify(
@@ -858,8 +860,9 @@ mod tests {
         let (mut mint_transcript, mut client_transcript) = transcripts();
         let mint_privkey = privkey();
         let amount_attr = AmountAttribute::new(12, None);
-        let tag = Scalar::random();
-        let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+        let nonce = Scalar::random();
+        let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+        let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
             .expect("Couldn't generate MAC");
         let randomized_coms =
             RandomizedCommitments::from_attributes_and_mac(&amount_attr, None, tag, mac, false)
@@ -916,8 +919,9 @@ mod tests {
         let (mut mint_transcript, mut client_transcript) = transcripts();
         let mint_privkey = privkey();
         let amount_attr = AmountAttribute::new(12, None);
-        let tag = Scalar::random();
-        let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+        let nonce = Scalar::random();
+        let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+        let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
             .expect("Couldn't generate MAC");
         let randomized_coms = generate_custom_rand(&amount_attr, tag, mac).unwrap();
         let proof = MacProof::create(
@@ -952,7 +956,7 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(&privkey, input.commitment(), None, *tag).expect("MAC expected")
+                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.commitment(), None).map(|(_t, v)| v).expect("MAC expected")
             })
             .collect();
         let proof = BalanceProof::create(&inputs, &outputs, &mut client_transcript);
@@ -993,7 +997,7 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(&privkey, input.commitment(), None, *tag).expect("MAC expected")
+                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.commitment(), None).map(|(_t, v)| v).expect("MAC expected")
             })
             .collect();
         let proof = BalanceProof::create(&inputs, &outputs, &mut client_transcript);
@@ -1054,12 +1058,7 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(
-                    &privkey,
-                    input.0.commitment(),
-                    Some(input.1.commitment()),
-                    *tag,
-                )
+                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.0.commitment(), Some(input.1.commitment())).map(|(_t, v)| v)
                 .expect("MAC expected")
             })
             .collect();
@@ -1132,12 +1131,7 @@ mod tests {
             .iter()
             .zip(tags.iter())
             .map(|(input, tag)| {
-                MAC::generate(
-                    &privkey,
-                    input.0.commitment(),
-                    Some(input.1.commitment()),
-                    *tag,
-                )
+                MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.0.commitment(), Some(input.1.commitment())).map(|(_t, v)| v)
                 .expect("MAC expected")
             })
             .collect();

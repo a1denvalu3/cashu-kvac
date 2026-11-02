@@ -35,8 +35,9 @@ fn bench_bootstrap_proof(bencher: &mut Bencher) {
 fn bench_iparams_proof(bencher: &mut Bencher) {
     let mint_privkey = privkey();
     let amount_attr = AmountAttribute::new(12, None);
-    let tag = Scalar::random();
-    let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+    let nonce = Scalar::random();
+    let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+    let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
         .expect("Couldn't generate MAC");
     bencher.iter(|| IssuanceProof::create(&mint_privkey, tag, mac, amount_attr.commitment(), None));
 }
@@ -46,8 +47,9 @@ fn bench_mac_proof(bencher: &mut Bencher) {
     let (_, mut client_transcript) = transcripts();
     let mint_privkey = privkey();
     let amount_attr = AmountAttribute::new(12, None);
-    let tag = Scalar::random();
-    let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+    let nonce = Scalar::random();
+    let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+    let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
         .expect("Couldn't generate MAC");
     let randomized_commitments =
         RandomizedCommitments::from_attributes_and_mac(&amount_attr, None, tag, mac, false)
@@ -105,12 +107,7 @@ fn bench_script_proofs(bencher: &mut Bencher) {
         .iter()
         .zip(tags.iter())
         .map(|(input, tag)| {
-            MAC::generate(
-                &privkey,
-                input.0.commitment(),
-                Some(input.1.commitment()),
-                *tag,
-            )
+            MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.0.commitment(), Some(input.1.commitment())).map(|(_t, v)| v)
             .expect("MAC expected")
         })
         .collect();
@@ -173,8 +170,9 @@ fn bench_bootstrap_proof_verification(bencher: &mut Bencher) {
 fn bench_iparams_proof_verification(bencher: &mut Bencher) {
     let mint_privkey = privkey();
     let amount_attr = AmountAttribute::new(12, None);
-    let tag = Scalar::random();
-    let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+    let nonce = Scalar::random();
+    let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+    let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
         .expect("Couldn't generate MAC");
     let proof = IssuanceProof::create(&mint_privkey, tag, mac, amount_attr.commitment(), None);
     bencher.iter(|| {
@@ -204,7 +202,7 @@ fn bench_balance_proof_verification(bencher: &mut Bencher) {
         .iter()
         .zip(tags.iter())
         .map(|(input, tag)| {
-            MAC::generate(&privkey, input.commitment(), None, *tag).expect("MAC expected")
+            MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.commitment(), None).map(|(_t, v)| v).expect("MAC expected")
         })
         .collect();
     let proof = BalanceProof::create(&inputs, &outputs, &mut client_transcript);
@@ -237,8 +235,9 @@ fn bench_mac_proof_verification(bencher: &mut Bencher) {
     let (mut mint_transcript, mut client_transcript) = transcripts();
     let mint_privkey = privkey();
     let amount_attr = AmountAttribute::new(12, None);
-    let tag = Scalar::random();
-    let mac = MAC::generate(&mint_privkey, amount_attr.commitment(), None, tag)
+    let nonce = Scalar::random();
+    let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+    let (tag, mac) = MAC::generate(&mint_privkey, &nonce_bytes, amount_attr.commitment(), None)
         .expect("Couldn't generate MAC");
     let randomized_commitments =
         RandomizedCommitments::from_attributes_and_mac(&amount_attr, None, tag, mac, false)
@@ -296,12 +295,7 @@ fn bench_script_proof_verification(bencher: &mut Bencher) {
         .iter()
         .zip(tags.iter())
         .map(|(input, tag)| {
-            MAC::generate(
-                &privkey,
-                input.0.commitment(),
-                Some(input.1.commitment()),
-                *tag,
-            )
+            MAC::generate(&privkey, &<[u8; 32]>::from(tag.as_ref()), input.0.commitment(), Some(input.1.commitment())).map(|(_t, v)| v)
             .expect("MAC expected")
         })
         .collect();
