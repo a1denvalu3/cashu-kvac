@@ -59,6 +59,7 @@ fn bench_mac_proof(bencher: &mut Bencher) {
             None,
             tag,
             &randomized_commitments,
+            false,
             &mut client_transcript,
         )
     });
@@ -249,6 +250,7 @@ fn bench_mac_proof_verification(bencher: &mut Bencher) {
         None,
         tag,
         &randomized_commitments,
+        false,
         &mut client_transcript,
     );
     bencher.iter(|| {

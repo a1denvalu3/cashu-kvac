@@ -243,6 +243,11 @@ impl MacProof {
     /// * `Z` - A `GroupElement` representing the left-hand side of the first equation.
     /// * `I` - A `GroupElement` representing the public key component used in the proof.
     /// * `randomized_coin` - A reference to a `RandomizedCoin` that contains the commitments needed for the proof.
+    /// * `script_revealed` - Whether the holder reveals the script to the verifier on this
+    ///   presentation. When `true`, the `Cs` equation drops the `G_script` witness so that
+    ///   the verifier's own completion `Cs' = Cs + H(script) * G_script` pins the revealed
+    ///   script to the one the MAC was issued over. When `false` the full
+    ///   `Cs = r_a*Gz_script + s*G_script + r_s*G_blind` relation is proven as before.
     ///
     /// # Returns
     ///
@@ -251,6 +256,7 @@ impl MacProof {
         Z: GroupElement,
         I: GroupElement,
         randomized_commitments: &RandomizedCommitments,
+        script_revealed: bool,
     ) -> Statement {
         let Cx0 = randomized_commitments.Cx0;
         let Cx1 = randomized_commitments.Cx1;
@@ -258,39 +264,58 @@ impl MacProof {
         let Cs = randomized_commitments.Cs;
         let O = GENERATORS.O;
         // Can you change the initialization of Equation in the last two entries to use `new` like the first?
-        Statement::new(
-            b"MAC_Statement_",
-            vec![
-                // Z = r*I
-                Equation::new(Z, vec![vec![I]]),
-                Equation::new(
-                    // Cx1 = t*Cx0 + (-tr)*X0 + r*X1
-                    Cx1,
-                    vec![vec![GENERATORS.X1, GENERATORS.X0, Cx0]],
-                ),
-                Equation::new(
-                    // Ca = r_a*Gz_attribute + r_a*G_blind + a*G_amount
-                    // MULTI-ROW: `r` witness is used twice for Gz_amount and G_blind
-                    Ca,
-                    vec![
-                        vec![GENERATORS.Gz_attribute, O, O, GENERATORS.G_amount],
-                        vec![GENERATORS.G_blind],
-                    ],
-                ),
-                Equation::new(
-                    // Cs = r_a*Gz_script + s*G_script + r_s*G_blind
-                    Cs,
-                    vec![vec![
-                        GENERATORS.Gz_script,
-                        O,
-                        O,
-                        O,
-                        GENERATORS.G_script,
-                        GENERATORS.G_blind,
-                    ]],
-                ),
-            ],
-        )
+        let mut equations = vec![
+            // Z = r*I
+            Equation::new(Z, vec![vec![I]]),
+            Equation::new(
+                // Cx1 = t*Cx0 + (-tr)*X0 + r*X1
+                Cx1,
+                vec![vec![GENERATORS.X1, GENERATORS.X0, Cx0]],
+            ),
+            Equation::new(
+                // Ca = r_a*Gz_attribute + r_a*G_blind + a*G_amount
+                // MULTI-ROW: `r` witness is used twice for Gz_amount and G_blind
+                Ca,
+                vec![
+                    vec![GENERATORS.Gz_attribute, O, O, GENERATORS.G_amount],
+                    vec![GENERATORS.G_blind],
+                ],
+            ),
+        ];
+        if script_revealed {
+            // Reveal path: the holder commits to only (r_a, r_s); the verifier adds
+            // s_revealed*G_script itself when computing Z. Cs must therefore be
+            // constrained to span(Gz_script, G_blind), so that the mint-controlled
+            // shift by s_revealed*G_script lands on the issued script commitment.
+            // If the s*G_script witness were still present here, a prover could
+            // absorb s_issued - s_revealed into Cs and have a coin bound to one
+            // script verified against another.
+            equations.push(Equation::new(
+                // Cs = r_a*Gz_script + r_s*G_blind
+                Cs,
+                vec![vec![
+                    GENERATORS.Gz_script,
+                    O,
+                    O,
+                    O,
+                    GENERATORS.G_blind,
+                ]],
+            ));
+        } else {
+            equations.push(Equation::new(
+                // Cs = r_a*Gz_script + s*G_script + r_s*G_blind
+                Cs,
+                vec![vec![
+                    GENERATORS.Gz_script,
+                    O,
+                    O,
+                    O,
+                    GENERATORS.G_script,
+                    GENERATORS.G_blind,
+                ]],
+            ));
+        }
+        Statement::new(b"MAC_Statement_", equations)
     }
 
     /// Creates a zero-knowledge proof (ZKP) for the MAC proof using the provided parameters.
@@ -313,6 +338,7 @@ impl MacProof {
         script_attribute: Option<&ScriptAttribute>,
         tag: Scalar,
         randomized_commitments: &RandomizedCommitments,
+        reveal_script: bool,
         transcript: &mut CashuTranscript,
     ) -> ZKP {
         let r_a = amount_attribute.r;
@@ -329,8 +355,15 @@ impl MacProof {
         let r0 = -r_a * t.as_ref();
         let (_Cw, I) = (mint_publickey.Cw.as_ref(), mint_publickey.I.as_ref());
         let Z = *I * &amount_attribute.r;
-        let statement = MacProof::statement(Z, *I, randomized_commitments);
-        SchnorrProver::new(transcript, vec![r_a, r0, t, a, s, r_s])
+        let statement = MacProof::statement(Z, *I, randomized_commitments, reveal_script);
+        // On the reveal path the `s` witness is not proven; the verifier supplies
+        // H(script)*G_script itself, so the secrets vector drops `s`.
+        let secrets = if reveal_script {
+            vec![r_a, r0, t, a, r_s]
+        } else {
+            vec![r_a, r0, t, a, s, r_s]
+        };
+        SchnorrProver::new(transcript, secrets)
             .add_statement(statement)
             .prove()
     }
@@ -342,6 +375,9 @@ impl MacProof {
     /// * `mint_privkey` - A reference to the `MintPrivateKey` used for verification.
     /// * `randomized_commitments` - A reference to `RandomizedCommitments` that contains the commitments needed for verification.
     /// * `script` - An optional reference to a byte slice representing the script, if applicable.
+    ///   When `Some`, the verification runs in reveal mode and the `G_script` witness term is
+    ///   dropped from the `Cs` equation, so the verifier's own `Cs + H(script)*G_script` in the
+    ///   issuer-side check pins the revealed script to the script the MAC was issued over.
     /// * `proof` - A `ZKP` instance containing the proof to be verified.
     /// * `transcript` - A mutable reference to a `CashuTranscript` that will be used during the verification.
     ///
@@ -380,7 +416,7 @@ impl MacProof {
             mint_privkey.public_key.Cw.as_ref(),
             mint_privkey.public_key.I.as_ref(),
         );
-        let statement = MacProof::statement(Z, *I, randomized_coin);
+        let statement = MacProof::statement(Z, *I, randomized_coin, script.is_some());
         SchnorrVerifier::new(transcript, proof)
             .add_statement(statement)
             .verify()
@@ -870,6 +906,7 @@ mod tests {
             None,
             tag,
             &randomized_coms,
+            false,
             &mut client_transcript,
         );
         assert!(MacProof::verify(
@@ -926,6 +963,7 @@ mod tests {
             None,
             tag,
             &randomized_coms,
+            false,
             &mut client_transcript,
         );
         assert!(!MacProof::verify(
@@ -1173,5 +1211,116 @@ mod tests {
             proof,
             mint_transcript.as_mut()
         ))
+    }
+
+    /// Regression for issue #2 (script substitution on the reveal path).
+    ///
+    /// A coin honestly bound to script A (its MAC covers `M_s = s_A*G_script + r_s*G_blind`)
+    /// was previously spendable while revealing an unrelated script B, because the
+    /// prover could absorb `s_A - s_B` into the free `G_script` witness of the `Cs`
+    /// equation. With the reveal-path statement dropping `G_script`, that freedom is gone
+    /// and the attack presentation must fail, while an honest reveal succeeds.
+    #[test]
+    fn test_reveal_path_binds_script() {
+        use bitcoin::hashes::sha256::Hash as Sha256Hash;
+        use bitcoin::hashes::Hash;
+
+        let key = privkey();
+        let script_a: &[u8] = b"spending-condition-A";
+        let script_b: &[u8] = b"totally-unrelated-script-B";
+        let s_a = Scalar::new(&Sha256Hash::hash(script_a).to_byte_array());
+        let s_b = Scalar::new(&Sha256Hash::hash(script_b).to_byte_array());
+
+        // Coin with amount 12 honestly bound to script A.
+        let amount_attr = AmountAttribute::new(12, None);
+        let script_attr = ScriptAttribute::new(script_a, None);
+        let tag = Scalar::random();
+        let mac = MAC::generate(
+            &key,
+            amount_attr.commitment(),
+            Some(script_attr.commitment()),
+            tag,
+        )
+        .expect("MAC expected");
+
+        // --- Honest reveal of the bound script A verifies. ---
+        let rc_honest = RandomizedCommitments::from_attributes_and_mac(
+            &amount_attr,
+            Some(&script_attr),
+            tag,
+            mac,
+            true, // reveal_script
+        )
+        .expect("randomized commitments");
+        let mut tm0 = CashuTranscript::new();
+        let mut tw0 = CashuTranscript::new();
+        let p0 = MacProof::create(
+            &key.public_key,
+            &amount_attr,
+            Some(&script_attr),
+            tag,
+            &rc_honest,
+            true,
+            &mut tw0,
+        );
+        assert!(
+            MacProof::verify(&key, &rc_honest, Some(script_a), p0, &mut tm0),
+            "honest reveal of the bound script must verify"
+        );
+
+        // --- Attack: craft Cs absorbing (s_A - s_B) and reveal B. ---
+        let crafted = RandomizedCommitments {
+            Ca: rc_honest.Ca,
+            Cs: GENERATORS.Gz_script * &amount_attr.r
+                + &(GENERATORS.G_script * &(s_a - &s_b))
+                + &(GENERATORS.G_blind * &script_attr.r),
+            Cx0: rc_honest.Cx0,
+            Cx1: rc_honest.Cx1,
+            Cv: rc_honest.Cv,
+        };
+        let shifted = ScriptAttribute {
+            s: s_a - &s_b,
+            r: script_attr.r,
+        };
+        let mut tm1 = CashuTranscript::new();
+        let mut tw1 = CashuTranscript::new();
+        let p1 = MacProof::create(
+            &key.public_key,
+            &amount_attr,
+            Some(&shifted),
+            tag,
+            &crafted,
+            true,
+            &mut tw1,
+        );
+        assert!(
+            !MacProof::verify(&key, &crafted, Some(script_b), p1, &mut tm1),
+            "crafted presentation revealing a different script must be rejected"
+        );
+
+        // --- Control: the same coin presented on the hidden path still verifies. ---
+        let rc_hidden = RandomizedCommitments::from_attributes_and_mac(
+            &amount_attr,
+            Some(&script_attr),
+            tag,
+            mac,
+            false,
+        )
+        .expect("randomized commitments");
+        let mut tm2 = CashuTranscript::new();
+        let mut tw2 = CashuTranscript::new();
+        let p2 = MacProof::create(
+            &key.public_key,
+            &amount_attr,
+            Some(&script_attr),
+            tag,
+            &rc_hidden,
+            false,
+            &mut tw2,
+        );
+        assert!(
+            MacProof::verify(&key, &rc_hidden, None, p2, &mut tm2),
+            "hidden-path presentation of the same coin must still verify"
+        );
     }
 }
