@@ -293,13 +293,7 @@ impl MacProof {
             equations.push(Equation::new(
                 // Cs = r_a*Gz_script + r_s*G_blind
                 Cs,
-                vec![vec![
-                    GENERATORS.Gz_script,
-                    O,
-                    O,
-                    O,
-                    GENERATORS.G_blind,
-                ]],
+                vec![vec![GENERATORS.Gz_script, O, O, O, GENERATORS.G_blind]],
             ));
         } else {
             equations.push(Equation::new(
