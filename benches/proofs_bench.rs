@@ -109,7 +109,7 @@ fn bench_script_proofs(bencher: &mut Bencher) {
         .map(|(input, tag)| {
             MAC::generate(
                 &privkey,
-                &<[u8; 32]>::from(tag.as_ref()),
+                &<[u8; 32]>::from(tag),
                 input.0.commitment(),
                 Some(input.1.commitment()),
             )
@@ -208,14 +208,9 @@ fn bench_balance_proof_verification(bencher: &mut Bencher) {
         .iter()
         .zip(tags.iter())
         .map(|(input, tag)| {
-            MAC::generate(
-                &privkey,
-                &<[u8; 32]>::from(tag.as_ref()),
-                input.commitment(),
-                None,
-            )
-            .map(|(_t, v)| v)
-            .expect("MAC expected")
+            MAC::generate(&privkey, &<[u8; 32]>::from(tag), input.commitment(), None)
+                .map(|(_t, v)| v)
+                .expect("MAC expected")
         })
         .collect();
     let proof = BalanceProof::create(&inputs, &outputs, &mut client_transcript);
@@ -310,7 +305,7 @@ fn bench_script_proof_verification(bencher: &mut Bencher) {
         .map(|(input, tag)| {
             MAC::generate(
                 &privkey,
-                &<[u8; 32]>::from(tag.as_ref()),
+                &<[u8; 32]>::from(tag),
                 input.0.commitment(),
                 Some(input.1.commitment()),
             )

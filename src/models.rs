@@ -287,7 +287,7 @@ impl MAC {
         // Derive a per-request tag from the Mint's private key material and the request.
         let mut key_engine = Sha256Hash::engine();
         for scalar in privkey.to_scalars().iter() {
-            key_engine.input(&<[u8; 32]>::from(scalar.as_ref()));
+            key_engine.input(&<[u8; 32]>::from(scalar));
         }
         let tag_key = Sha256Hash::from_engine(key_engine);
         let mut hmac = HmacEngine::<Sha256Hash>::new(&tag_key.to_byte_array());
