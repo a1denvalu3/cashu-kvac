@@ -1238,12 +1238,13 @@ mod tests {
         // Coin with amount 12 honestly bound to script A.
         let amount_attr = AmountAttribute::new(12, None);
         let script_attr = ScriptAttribute::new(script_a, None);
-        let tag = Scalar::random();
-        let mac = MAC::generate(
+        let nonce = Scalar::random();
+        let nonce_bytes: [u8; 32] = nonce.as_ref().into();
+        let (tag, mac) = MAC::generate(
             &key,
+            &nonce_bytes,
             amount_attr.commitment(),
             Some(script_attr.commitment()),
-            tag,
         )
         .expect("MAC expected");
 
