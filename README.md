@@ -36,6 +36,31 @@ Initial attribute, commitment, parameter, and verification-proof setup is exclud
 parameter validation performed inside the public proof APIs remains timed.
 Timings are per aggregated proof, rather than per amount.
 
+To print proof sizes for the same item counts as CSV:
+
+```shell
+cargo run --release --example range_proof_sizes
+```
+
+Pass item counts after `--` to explore other batch sizes, including padding effects:
+
+```shell
+cargo run --release --example range_proof_sizes -- 1 2 3 4 8 16 32 64 128
+```
+
+The report includes the actual compact JSON size of the serialized `RangeZKP`
+and the raw cryptographic payload (32 bytes per scalar, 33 bytes per compressed
+point). The payload count excludes encoding and framing; it is not an implemented
+binary wire format. Both counts exclude public commitments and shared parameters.
+Every serialized proof is deserialized and verified before reporting its size.
+
+The measured baseline from 2026-11-03 on an Intel Core Ultra 9 185H is saved as
+[timing CSV](benches/results/range_proof_timings.csv) and
+[size CSV](benches/results/range_proof_sizes.csv).
+[Environment and full measurements](benches/results/range_proofs.json) include
+the compiler, source revision, input amounts, and reported timing spread.
+Timings cover 1–32 items; sizes also cover 3, 64, and 128 items.
+
 SHARP-PoSO has relaxed soundness, as described in `src/sharp.rs`. Its current
 three-square search depends on the witness value, so these small-amount benchmarks
 do not establish its performance across the full range.
