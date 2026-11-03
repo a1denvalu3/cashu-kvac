@@ -35,6 +35,9 @@ jobs:
 
       - name: Run tests
         run: cargo test --verbose
+
+      - name: Check range proof benchmarks
+        run: cargo test --bench range_proofs_bench
       
       - name: Add wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown

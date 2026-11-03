@@ -14,6 +14,32 @@ cargo build && cargo test
 cargo +nightly bench
 ```
 
+To compare Bulletproof and SHARP-PoSO range proofs:
+
+```shell
+cargo +nightly bench --bench range_proofs_bench
+```
+
+To check all benchmark cases once without collecting timings (also run in CI):
+
+```shell
+cargo +nightly test --bench range_proofs_bench
+```
+
+The suite measures proving and verification separately for one aggregated proof
+over 1, 2, 4, 8, 16, or 32 amounts. Both schemes use the same amounts and the
+32-bit range `[0, 2^32 - 1]`. Inputs cycle through `[14, 1, 11, 2, 3, 7, 42, 255]`,
+with random blinding factors generated before timing. Each timed operation starts
+with a fresh transcript. Verification includes cloning the proof required by
+`RangeProof::verify` and asserts that verification succeeds on every iteration.
+Initial attribute, commitment, parameter, and verification-proof setup is excluded;
+parameter validation performed inside the public proof APIs remains timed.
+Timings are per aggregated proof, rather than per amount.
+
+SHARP-PoSO has relaxed soundness, as described in `src/sharp.rs`. Its current
+three-square search depends on the witness value, so these small-amount benchmarks
+do not establish its performance across the full range.
+
 ### Usage Examples
 
 Creating a `AmountAttribute`:
