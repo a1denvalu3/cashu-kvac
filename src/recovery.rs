@@ -55,7 +55,7 @@ pub fn recover_amounts(
     let one = GENERATORS.G_amount;
 
     for j in 1..m {
-        index = index + &one;
+        index += &one;
         table.insert(index, j);
     }
 
@@ -73,7 +73,7 @@ pub fn recover_amounts(
                     a = Some(i * m + j);
                     break;
                 }
-                None => A = A + &G_m_inv,
+                None => A += &G_m_inv,
             }
         }
 

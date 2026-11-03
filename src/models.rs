@@ -113,9 +113,13 @@ impl ZKP {
 }
 
 /// Zero-knowledge proof (ZKP) with `s` responses and `c` challenge.
-#[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq)]
 pub enum RangeZKP {
+    /// Bulletproof: classic inner-product range proof (exact soundness).
     BULLETPROOF(BulletProof),
+    /// SharpPoSO: relaxed range proof over secp256k1 (CCS 2022).
+    /// See `crate::sharp::SharpPOSO` for the soundness semantics.
+    SHARPPOSO(crate::sharp::SharpPOSO),
 }
 
 /// Structure holding the secret values for pedersen commitment encoding a script (spending conditions)

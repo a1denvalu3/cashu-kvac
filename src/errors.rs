@@ -22,6 +22,18 @@ pub enum Error {
     ScalarZero,
     #[error("Cannot instantiate GroupElement from hex string zero")]
     GroupElementZero,
+
+    /// SharpPoSO errors
+    #[error("Parameter setup failed")]
+    ParameterSetupFailure,
+    #[error("Maximum allowed range for range-proof is invalid")]
+    InvalidRangeBound,
+    #[error("Positive integer not representable with a 3-square sum")]
+    ThreeSquaresFailure,
+    #[error("Attribute value is out of range")]
+    OutOfRangeError,
+    #[error("Short masking failed")]
+    MaskingFailure,
     /// Secp256k1 error
     #[error(transparent)]
     Secp256k1(#[from] secp256k1::Error),

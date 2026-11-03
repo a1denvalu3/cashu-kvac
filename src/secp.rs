@@ -434,6 +434,12 @@ impl std::ops::Add<&Scalar> for Scalar {
     }
 }
 
+impl std::ops::AddAssign<&Scalar> for Scalar {
+    fn add_assign(&mut self, rhs: &Scalar) {
+        self.tweak_add(rhs);
+    }
+}
+
 impl std::ops::Neg for Scalar {
     type Output = Scalar;
 
@@ -546,6 +552,18 @@ impl std::str::FromStr for Scalar {
     }
 }
 
+impl TryFrom<&BigInt> for Scalar {
+    type Error = Error;
+    fn try_from(value: &BigInt) -> Result<Self, Error> {
+        let (_, mut value_bytes) = value.to_bytes_le();
+        if value_bytes.len() < 32 {
+            value_bytes.resize(32, 0u8);
+        }
+        value_bytes.reverse();
+        Ok(Scalar::new(&value_bytes))
+    }
+}
+
 impl TryFrom<&str> for Scalar {
     type Error = Error;
     fn try_from(hex_string: &str) -> Result<Self, Error> {
@@ -596,6 +614,12 @@ impl std::ops::Add<&GroupElement> for GroupElement {
     fn add(mut self, other: &GroupElement) -> GroupElement {
         self.combine_add(other);
         self
+    }
+}
+
+impl std::ops::AddAssign<&GroupElement> for GroupElement {
+    fn add_assign(&mut self, rhs: &GroupElement) {
+        self.combine_add(rhs);
     }
 }
 

@@ -1,0 +1,258 @@
+{
+  "recorded_at_utc": "2026-11-03T12:56:31.819079+00:00",
+  "benchmark_revision": "2123ecccd1ddcd369daaac94bbed4d636aeae711",
+  "cpu": "Intel(R) Core(TM) Ultra 9 185H",
+  "rustc": "rustc 1.101.0-nightly (3e92e1a2d 2026-11-01)",
+  "command": "cargo +nightly bench --bench range_proofs_bench",
+  "range_max": 4294967295,
+  "amounts": [
+    14,
+    1,
+    11,
+    2,
+    3,
+    7,
+    42,
+    255
+  ],
+  "results": [
+    {
+      "scheme": "bulletproof",
+      "operation": "prove",
+      "items": 1,
+      "ns_per_iteration": 20758429.0,
+      "reported_spread_ns": 2798446.87
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "prove",
+      "items": 2,
+      "ns_per_iteration": 38802567.1,
+      "reported_spread_ns": 961993.99
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "prove",
+      "items": 4,
+      "ns_per_iteration": 77444992.0,
+      "reported_spread_ns": 1396948.93
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "prove",
+      "items": 8,
+      "ns_per_iteration": 156000992.0,
+      "reported_spread_ns": 11729625.92
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "prove",
+      "items": 16,
+      "ns_per_iteration": 310478047.4,
+      "reported_spread_ns": 23766264.55
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "prove",
+      "items": 32,
+      "ns_per_iteration": 618673587.2,
+      "reported_spread_ns": 42359614.63
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "verify",
+      "items": 1,
+      "ns_per_iteration": 10864546.4,
+      "reported_spread_ns": 335909.82
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "verify",
+      "items": 2,
+      "ns_per_iteration": 21231734.1,
+      "reported_spread_ns": 1835842.05
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "verify",
+      "items": 4,
+      "ns_per_iteration": 41803853.3,
+      "reported_spread_ns": 1494512.43
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "verify",
+      "items": 8,
+      "ns_per_iteration": 82718060.5,
+      "reported_spread_ns": 4473724.04
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "verify",
+      "items": 16,
+      "ns_per_iteration": 166163560.1,
+      "reported_spread_ns": 11510801.84
+    },
+    {
+      "scheme": "bulletproof",
+      "operation": "verify",
+      "items": 32,
+      "ns_per_iteration": 336761931.7,
+      "reported_spread_ns": 30652651.23
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "prove",
+      "items": 1,
+      "ns_per_iteration": 16744388.1,
+      "reported_spread_ns": 1260292.72
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "prove",
+      "items": 2,
+      "ns_per_iteration": 19946020.6,
+      "reported_spread_ns": 1258613.14
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "prove",
+      "items": 4,
+      "ns_per_iteration": 35145048.5,
+      "reported_spread_ns": 1062203.5
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "prove",
+      "items": 8,
+      "ns_per_iteration": 297434259.6,
+      "reported_spread_ns": 20448683.02
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "prove",
+      "items": 16,
+      "ns_per_iteration": 591976492.8,
+      "reported_spread_ns": 28354732.83
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "prove",
+      "items": 32,
+      "ns_per_iteration": 1204750700.1,
+      "reported_spread_ns": 118783086.57
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "verify",
+      "items": 1,
+      "ns_per_iteration": 960001.85,
+      "reported_spread_ns": 36994.2
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "verify",
+      "items": 2,
+      "ns_per_iteration": 1293318.95,
+      "reported_spread_ns": 67784.9
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "verify",
+      "items": 4,
+      "ns_per_iteration": 1963191.2,
+      "reported_spread_ns": 96305.05
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "verify",
+      "items": 8,
+      "ns_per_iteration": 3362680.55,
+      "reported_spread_ns": 226618.92
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "verify",
+      "items": 16,
+      "ns_per_iteration": 6267100.9,
+      "reported_spread_ns": 466534.85
+    },
+    {
+      "scheme": "sharp_poso",
+      "operation": "verify",
+      "items": 32,
+      "ns_per_iteration": 12368636.9,
+      "reported_spread_ns": 1322008.06
+    }
+  ],
+  "size_report_command": "cargo run --release --example range_proof_sizes -- 1 2 3 4 8 16 32 64 128",
+  "proof_sizes": [
+    {
+      "items": 1,
+      "bulletproof_payload_bytes": 622,
+      "sharp_poso_payload_bytes": 642,
+      "bulletproof_json_bytes": 1473,
+      "sharp_poso_json_bytes": 1461
+    },
+    {
+      "items": 2,
+      "bulletproof_payload_bytes": 688,
+      "sharp_poso_payload_bytes": 802,
+      "bulletproof_json_bytes": 1611,
+      "sharp_poso_json_bytes": 1796
+    },
+    {
+      "items": 3,
+      "bulletproof_payload_bytes": 754,
+      "sharp_poso_payload_bytes": 962,
+      "bulletproof_json_bytes": 1749,
+      "sharp_poso_json_bytes": 2131
+    },
+    {
+      "items": 4,
+      "bulletproof_payload_bytes": 754,
+      "sharp_poso_payload_bytes": 1122,
+      "bulletproof_json_bytes": 1749,
+      "sharp_poso_json_bytes": 2466
+    },
+    {
+      "items": 8,
+      "bulletproof_payload_bytes": 820,
+      "sharp_poso_payload_bytes": 1762,
+      "bulletproof_json_bytes": 1887,
+      "sharp_poso_json_bytes": 3806
+    },
+    {
+      "items": 16,
+      "bulletproof_payload_bytes": 886,
+      "sharp_poso_payload_bytes": 3042,
+      "bulletproof_json_bytes": 2025,
+      "sharp_poso_json_bytes": 6486
+    },
+    {
+      "items": 32,
+      "bulletproof_payload_bytes": 952,
+      "sharp_poso_payload_bytes": 5602,
+      "bulletproof_json_bytes": 2163,
+      "sharp_poso_json_bytes": 11846
+    },
+    {
+      "items": 64,
+      "bulletproof_payload_bytes": 1018,
+      "sharp_poso_payload_bytes": 10722,
+      "bulletproof_json_bytes": 2301,
+      "sharp_poso_json_bytes": 22566
+    },
+    {
+      "items": 128,
+      "bulletproof_payload_bytes": 1084,
+      "sharp_poso_payload_bytes": 20962,
+      "bulletproof_json_bytes": 2439,
+      "sharp_poso_json_bytes": 44006
+    }
+  ],
+  "size_definitions": {
+    "payload_bytes": "Sum of serialized scalar and compressed-point byte lengths, excluding framing, public commitments, and shared parameters; no compact binary codec is implemented.",
+    "json_bytes": "Byte length of serde_json::to_vec(RangeZKP), including enum and field names and hex expansion, excluding public commitments and shared parameters."
+  }
+}
