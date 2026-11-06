@@ -12,6 +12,18 @@ proof-debug = []
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
+[[example]]
+name = "attributes"
+path = "docs/examples/attributes.rs"
+
+[[example]]
+name = "issuance"
+path = "docs/examples/issuance.rs"
+
+[[example]]
+name = "swap"
+path = "docs/examples/swap.rs"
+
 [dependencies]
 bitcoin = { version= "0.32.2", features = ["base64", "serde", "rand", "rand-std"] }
 getrandom = { version = "0.2.3", features = ["js"]}
