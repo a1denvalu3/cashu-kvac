@@ -1,169 +1,77 @@
 # Anonymous Credentials for Cashu
 
-Experimental implementation of the core crypto behind an anonymous credentials enabled Mint.
+`cashu-kvac` is an experimental implementation of the cryptographic primitives
+behind a Cashu mint using keyed-verification anonymous credentials (KVAC).
+It explores credentials that carry hidden amounts and optional spending conditions,
+with zero-knowledge proofs for issuance and spending.
 
-### Compile and Run Tests
+The Rust library provides the core cryptography, with WebAssembly bindings for
+JavaScript. A Python implementation is also available in [`python/`](python/).
 
-```shell
-cargo build && cargo test
-```
+## What it provides
 
-### Run Benchmarks
+- **Amount and script commitments:** Pedersen commitments hide a credential's
+  amount and optional spending conditions.
+- **Credential issuance and presentation:** algebraic MACs authenticate those
+  commitments, issuance proofs let wallets check the mint's response, and
+  randomized presentations let wallets prove ownership to the mint.
+- **Transaction proofs:** bootstrap, balance, script equality, and Bulletproof
+  range proofs establish the relationships needed for mint, swap, and melt flows.
+- **Amount recovery:** recovery helpers recover amounts from commitments when
+  the wallet knows the blinding factors and an upper bound on the amounts.
 
-```shell
-cargo +nightly bench
-```
+## How it fits together
 
-### Usage Examples
+A wallet creates commitments to its attributes and sends them to the mint with
+a fresh issuance nonce. The mint derives a tag from its private key and the
+request, then returns a MAC and a proof of issuance. The wallet verifies that
+response and keeps the attributes, nonce, tag, and MAC for later use.
 
-Creating a `AmountAttribute`:
-```rust
-use cashu_kvac::models::AmountAttribute;
+To spend a credential, the wallet constructs randomized commitments and proves
+that it holds a valid MAC. Balance and range proofs let the mint check the
+relationship between inputs and outputs without learning their individual amounts.
+Script proofs support carrying spending conditions forward or revealing them.
+The mint also tracks nullifiers to prevent double spending.
 
-// Normal
-let amount_attribute = AmountAttribute::new(10, None);
+This repository implements these building blocks; integrating them into a mint
+requires the surrounding transaction handling, storage, and spending-condition
+validation.
 
-// Chosen blinding factor (e.g. derived from BIP32)
-let custom_blinding_factor = b"deadbeefdeadbeefdeadbeefdeadbeef";
-let amount_attribute_1 = AmountAttribute::new(10, Some(custom_blinding_factor));
-```
+## Documentation
 
-Creating a `ScriptAttribute`:
-```rust
-use cashu_kvac::models::ScriptAttribute;
+- [Usage guide and runnable Rust examples](docs/usage.md): attributes, issuance,
+  hidden and revealed scripts, and a balanced swap with proof verification.
+- [Development guide](docs/development.md): building, testing, benchmarks, and
+  WebAssembly/JavaScript bindings.
+- [Protocol explanation](docs/protocol_explanation.md): definitions and the
+  credential construction (work in progress).
+- [Deterministic recovery](docs/deterministic_recovery.md): recovering attributes
+  and checking whether recovered credentials have been spent.
 
-let script = b"38c3";
+## Design notes
 
-// Normal
-let script_attribute = ScriptAttribute::new(script, None);
+The construction uses secp256k1 and Pedersen commitments with generators whose
+discrete logarithm relationships are unknown. It reuses the amount attribute's
+blinding factor for presentation randomization, avoiding a separate serial proof.
+The mint can also tweak an amount commitment by adding a public amount offset,
+which can represent adjustments such as returning excess fees.
 
-// Chosen blinding factor (derived from BIP32)
-let custom_blinding_factor = b"deadbeefdeadbeefdeadbeefdeadbeef";
-let script_attribute = ScriptAttribute::new(script, custom_blinding_factor);
-```
+Zero-knowledge proofs use a Merlin-based transcript with domain separation for
+each statement. Bulletproof range proofs constrain output amounts to 32 bits;
+these checks complement balance proofs by preventing out-of-range outputs.
 
-Issuing a `MAC` on a `AmountAttribute`:
-```rust
-use cashu_kvac::models::{AmountAttribute, ScriptAttribute, MAC, MintPrivateKey};
-use cashu_kvac::secp::Scalar;
+The design draws on:
 
-let scalars = (0..6).map(|_| Scalar::random()).collect();
-let mint_privkey = MintPrivateKey::from_scalars(&scalars).unwrap();
+- [WabiSabi: Centrally Coordinated CoinJoins with Variable Amounts](https://eprint.iacr.org/2021/206.pdf).
+- [The Signal Private Group System and Anonymous Credentials Supporting Efficient Verifiable Encryption](https://eprint.iacr.org/2019/1416).
+- [Bulletproofs](https://eprint.iacr.org/2017/1066.pdf) for range proofs.
 
-// Client generates these: the amount commitment and an unguessable per-request
-// nonce (32 random bytes, stored with the coin for later recovery).
-let amount_attribute = AmountAttribute::new(10, None);
-let amount_commitment = amount_attribute.commitment();
-let nonce = rand::random::<[u8; 32]>();
+Other range-proof constructions under consideration include
+[Bulletproofs++](https://eprint.iacr.org/2022/510.pdf) and
+[SHARP](https://eprint.iacr.org/2022/1153.pdf).
 
-// Mint derives the tag statelessly from (its private key, nonce, commitments) and
-// issues the MAC. Wallet-chosen tags are not accepted: a repeated tag would allow
-// combining two issued MACs into a forgery over an arbitrary amount.
-let (tag, mac) = MAC::generate(&mint_privkey, &nonce, amount_commitment, None).unwrap();
+## Project status
 
-```
-
-Creating `RandomizedCommitments` from attributes and MAC (mandatory before performing a swap, mint, melt):
-```rust
-use cashu_kvac::models::RandomizedCommitments;
-
-// Create randomized commitments from amount attribute, script attribute, tag, and MAC
-let randomized_commitments = RandomizedCommitments::from_attributes_and_mac(
-    &amount_attribute,
-    Some(&script_attribute), // or None if no script
-    tag,
-    mac,
-    false // reveal_script
-).unwrap();
-
-// Randomized commitments, but the script will be revealed
-let randomized_commitments_with_script_reveal = RandomizedCommitments::from_attributes_and_mac(
-    &amount_attribute,
-    Some(&script_attribute),
-    tag,
-    mac,
-    true // reveal_script
-).unwrap();
-```
-
-Proving the balance between inputs and outputs of a swap:
-```rust
-use cashu_kvac::transcript::CashuTranscript;
-use cashu_kvac::models::{AmountAttribute, MAC, MintPrivateKey};
-use cashu_kvac::secp::{Scalar, GroupElement};
-
-let mut transcript = CashuTranscript::new();
-
-let scalars = (0..6).map(|_| Scalar::random()).collect();
-let mint_privkey = MintPrivateKey::from_scalars(&scalars).unwrap();
-
-let inputs = vec![
-    AmountAttribute::new(12, None),
-    AmountAttribute::new(11, None),
-];
-let outputs = vec![AmountAttribute::new(23, None)];
-
-// We assume the inputs were already issued a MAC previously
-let tags: Vec<Scalar> = inputs.iter().map(|_| Scalar::random()).collect();
-let macs: Vec<GroupElement> = inputs
-    .iter()
-    .zip(tags.iter())
-    .map(|(input, tag)| {
-        MAC::generate(&mint_privkey, input.commitment(), None, *tag).expect("MAC expected")
-    })
-    .collect();
-
-let proof = BalanceProof::create(&inputs, &outputs, &mut transcript);
-```
-
-> [!NOTE]
-> You can prove prove/verify arbitrary statement with `SchorrProver` and `SchnorrVerifier`
-
-### WASM and Javascript bindings
-To generate the WASM and javascript bindings, install `wasm-pack`:
-
-```sh
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-```
-
-Clone this repository:
-```sh
-git clone https://github.com/lollerfirst/cashu-kvac
-```
-
-Then, navigate to the repository directory generate the WASM with:
-```sh
-wasm-pack build --target {node|web}
-```
-
-The library will be compiled to a package under `./pkg` from the root directory of the repository.
-
-### KVAC Scheme
-The design of this library is based around the KVAC scheme, and specifically around these 2 papers:
-
-* KVAC used for CoinJoins (WabiSabi): https://eprint.iacr.org/2021/206.pdf
-* The Signal Private Group System and Anonymous Credentials Supporting Efficient Verifiable Encryption: https://eprint.iacr.org/2019/1416
-
-### Protocol Explanation
-Definitions and Protocol explaination (WIP): [HERE](protocol_explanation.md)
-
-### Extras
-* [Deterministic Recovery](deterministic_recovery.md)
-* Server/Mint can tweak the amounts encoded in the attributes: $M_a' = M_a + \delta G_\text{amount}$ . This can be used to return things like excess fees in a concise way.
-* **[Deviation from scheme]** Using the $r$ blinding factor in Pedersen Commitments for both blinding and randomization:
-  * different generators with unknown discrete log between them guarantees hiding.
-  * Benefit: no $\pi_\text{serial}$ because not needed anymore.
-  * $C_a$ (Randomized Amount Commitment) is chosen to be the nullifier.
-
-### Range proofs
-
-Range proofs are needed to verify the outputs to the requests are within a certain range, preventing any potential overflows that could cheat the Balance Proof.
-
-Variations:
-
-* [x] [BULLETPROOFS](https://eprint.iacr.org/2017/1066.pdf)
-* [ ] [BULLETPROOFS++](https://eprint.iacr.org/2022/510.pdf) arithmetic circuits
-* [ ] [SHARP](https://eprint.iacr.org/2022/1153.pdf) which would improve creation/verification time tenfold. There are some different flavours of sharp, some of which make use of hidden order groups.
-
-### Transcript
-Every Zero-Knowledge proof uses a dedicated transcript defined in `transcript.rs` and tweaked by a domain separation byte-string for the various statements that need to be proven.
+This is experimental cryptographic code, and the protocol documentation is still
+a work in progress. See [SECURITY.md](SECURITY.md) for vulnerability reporting and
+[license](license) for licensing terms.
